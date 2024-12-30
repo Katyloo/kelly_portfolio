@@ -1,0 +1,118 @@
+-- Ques #1 We want to understand more about the movies that families are watching. 
+-- The following categories are considered family movies: Animation, Children, Classics, Comedy, Family and Music.
+-- Create a query that lists each movie, the film category it is classified in, and the number of times it has been rented out.
+
+SELECT film_title,
+    category_name,
+    COUNT(*) rental_count
+FROM
+    (SELECT f.title film_title,
+        c.name category_name,
+        r.rental_id rental_id
+    FROM film f 
+    JOIN film_category fc 
+    ON f.film_id = fc.film_id
+    JOIN category c 
+    ON fc.category_id = c.category_id 
+    JOIN inventory i 
+    ON f.film_id = i.film_id
+    JOIN rental r 
+    ON i.inventory_id = r.inventory_id) t1
+WHERE category_name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 1, 2
+ORDER BY 2, 1
+;
+
+-- Ques #2 Now we need to know how the length of rental duration of these family-friendly movies compares 
+-- to the duration that all movies are rented for. Can you provide a table with the movie titles and divide 
+-- them into 4 levels (first_quarter, second_quarter, third_quarter, and final_quarter) based on the quartiles 
+-- (25%, 50%, 75%) of the average rental duration(in the number of days) for movies across all categories? 
+-- Make sure to also indicate the category that these family-friendly movies fall into.
+
+WITH filmtables AS (
+    SELECT f.title film_title,
+        c.name category_name,
+        f.rental_duration rental_duration
+    FROM film f 
+    JOIN film_category fc 
+    ON f.film_id = fc.film_id
+    JOIN category c 
+    ON fc.category_id = c.category_id 
+)
+SELECT film_title,
+    category_name,
+    rental_duration,
+    NTILE(4) OVER (ORDER BY rental_duration) quartile
+FROM filmtables
+WHERE category_name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 1, 2, 3
+ORDER BY 2, 3, 4
+;
+
+-- Ques #3 Provide a table with the family-friendly film category, each of the quartiles, and the 
+-- corresponding count of movies within each combination of film category for each corresponding rental 
+-- duration category. The resulting table should have three columns:
+-- Category
+-- Rental length category
+-- Count
+
+WITH ft1 AS (
+    SELECT f.title film_title,
+        c.name category_name,
+        f.rental_duration rental_duration
+    FROM film f 
+    JOIN film_category fc 
+    ON f.film_id = fc.film_id
+    JOIN category c 
+    ON fc.category_id = c.category_id 
+),
+ft2 AS ( 
+    SELECT film_title,
+    category_name,
+    rental_duration,
+    NTILE(4) OVER (ORDER BY rental_duration) quartile
+FROM ft1
+WHERE category_name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+)
+SELECT ft2.category_name,
+    ft2.quartile,
+    COUNT(*) count 
+FROM ft2
+JOIN ft1
+ON ft1.film_title = ft2.film_title
+GROUP BY 1, 2
+ORDER BY 3
+;
+
+-- Ques #4 How popular is each family friendly category around the world?
+
+SELECT country,
+    category,
+    COUNT(film_title)
+FROM (
+    SELECT c.country country,
+        ca.name category,
+  		f.title film_title,
+  		f.rental_duration rental_duration
+    FROM country c 
+    JOIN city ci 
+    ON c.country_id = ci.country_id 
+    JOIN address a 
+    ON ci.city_id = a.city_id
+    JOIN customer cu 
+    ON a.address_id = cu.address_id
+    JOIN rental r 
+    ON r.customer_id = cu.customer_id 
+    JOIN inventory i 
+    ON i.inventory_id = r.inventory_id
+    JOIN film f 
+    ON f.film_id = i.film_id
+    JOIN film_category fc 
+    ON fc.film_id = f.film_id 
+    JOIN category ca
+    ON fc.category_id = ca.category_id 
+    ) t2
+WHERE category IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 2, 1
+ORDER BY 2, 3 DESC
+;
